@@ -14,7 +14,8 @@ A simple retrieval augmented generation (RAG) system that lets you collect email
 2. **Install Dependencies**
 
    ```bash
-   pip install -r requirements.txt
+   pip install uv
+   uv pip install -r requirements.txt
    ```
 
 3. **Set Up Environment Variables**  
@@ -23,7 +24,7 @@ A simple retrieval augmented generation (RAG) system that lets you collect email
    ```env
    GMAIL_USERNAME=your_email@gmail.com
    GMAIL_PASSWORD=your_gmail_app_password
-   OPENAI_API_KEY=your_openai_api_key
+   GOOGLE_API_KEY=your_openai_api_key
    ```
 
 4. **Configure the Application**  
