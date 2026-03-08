@@ -66,34 +66,78 @@ def read_mail(state: Annotated[AgentState, InjectedState()]):
 
 
 @tool
-def read_filtered_mails(sender: str, state: Annotated[AgentState, InjectedState()]):
-    """Read emails from a specific sender. Call ONCE only."""
+def search_email_flow(query: str, state: Annotated[AgentState, InjectedState()]):
+    """Search for emails from a specific person or email address.
+    Use for: search mail, find email from, emails by, filter by sender.
+    query = user's exact words about who to search for.
+    """
     tool_call_id = get_tool_call_id(state)
-    state["sender_filter"] = sender
-    state["email_ids"] = []
-    state["email_index"] = 0
-    result = read_filtered_emails_node(state)
+    step = state.get("search_step", "")
 
-    subject = result.get("email_subject", "")
-    email_from = result.get("email_from", "unknown")
-    body = result.get("email_body", "")
-    if body:
-        summary = summarize_email(subject, email_from, body)
-    else:
-        summary = result.get("response", "No emails found.")
+    # Reset if a new search starts
+    if any(kw in query.lower() for kw in ["find", "search", "filter", "look for"]):
+        step = ""
+
+    if not step or step == "":
+        sender = _parse_email(query)
+        if not sender:
+            # Fallback if it's just a name not an email
+            sender = query.lower().replace("find emails from", "").replace("search", "").replace("from", "").strip()
+
+        if not sender:
+            return Command(update={
+                "search_step": "awaiting_search_term",
+                "messages": [ToolMessage(content="Who would you like to search emails from?", tool_call_id=tool_call_id)]
+            })
+            
+        return Command(update={
+            "search_to": sender,
+            "search_step": "confirm_search",
+            "messages": [ToolMessage(
+                content=f"Searching for emails from '{sender}'. Is that the correct name or email? You can also type it below.",
+                tool_call_id=tool_call_id
+            )]
+        })
+
+    if step == "awaiting_search_term" or step == "confirm_search":
+        # Check if user is confirming or providing a new term
+        if any(w in query.lower() for w in ["yes", "correct", "confirm", "go ahead", "that's it"]):
+            state["sender_filter"] = state.get("search_to", "")
+            state["email_ids"] = []
+            state["email_index"] = 0
+            result = read_filtered_emails_node(state)
+            
+            subject = result.get("email_subject", "")
+            email_from = result.get("email_from", "unknown")
+            body = result.get("email_body", "")
+            summary = summarize_email(subject, email_from, body) if body else result.get("response", "No emails found.")
+
+            return Command(update={
+                "email_id": result.get("email_id", ""),
+                "email_from": email_from,
+                "email_subject": subject,
+                "email_body": body,
+                "email_ids": result.get("email_ids", []),
+                "email_index": result.get("email_index", 0),
+                "sender_filter": state["sender_filter"],
+                "search_to": "",
+                "search_step": "",
+                "messages": [ToolMessage(content=summary, tool_call_id=tool_call_id)]
+            })
+        else:
+            # Assume query is the new search term
+            sender = _parse_email(query) or query.strip()
+            return Command(update={
+                "search_to": sender,
+                "search_step": "confirm_search",
+                "messages": [ToolMessage(
+                    content=f"Understood. I'll search for '{sender}' instead. Correct?",
+                    tool_call_id=tool_call_id
+                )]
+            })
 
     return Command(update={
-        "email_id":      result.get("email_id", ""),
-        "email_from":    email_from,
-        "email_subject": subject,
-        "email_body":    body,
-        "email_ids":     result.get("email_ids", []),
-        "email_index":   result.get("email_index", 0),
-        "sender_filter": sender,
-        "messages": [ToolMessage(
-            content=summary,
-            tool_call_id=tool_call_id
-        )]
+        "messages": [ToolMessage(content="Something went wrong with the search.", tool_call_id=tool_call_id)]
     })
     
 @tool
@@ -347,8 +391,8 @@ def _parse_email(spoken: str) -> str:
     return ""
     
     
-tools = [read_mail, read_filtered_mails, navigate_email, delete_mail, star_email, unstar_email, 
-         untrash_email, send_email_flow]
+tools = [read_mail, navigate_email, delete_mail, star_email, unstar_email, 
+         untrash_email, send_email_flow, search_email_flow]
 
 llm_with_tools = llm.bind_tools(tools)
 tool_node = ToolNode(tools)
@@ -358,18 +402,17 @@ def call_llm(state: AgentState):
     messages = list(state["messages"])
     
     send_step = state.get("send_step", "")
-    print(f"CALL LLM - send_step: '{send_step}', last human: '{[m.content for m in messages if m.type == 'human'][-1:]}'")
-    print(f"CALL LLM - tool response in state: {state.get('draft_subject', 'NO DRAFT')}")
-    
+    search_step = state.get("search_step", "")
+
     state_context = ""
     if send_step == "awaiting_recipient":
         state_context = "\n\nCURRENT STATE: Email draft is ready. send_step=awaiting_recipient. You MUST call send_email_flow with topic = user's exact message. Do NOT respond without calling send_email_flow."
     elif send_step == "confirm_send":
-        state_context = (
-            f"\n\nCURRENT STATE: send_step=confirm_send. Email ready to send to {state.get('send_to','')}."
-            f"\nYou MUST call send_email_flow with topic = user's exact message."
-            f"\nDo NOT say anything without calling send_email_flow first."
-        )
+        state_context = f"\n\nCURRENT STATE: send_step=confirm_send. Email ready to send to {state.get('send_to','')}. Call send_email_flow."
+    elif search_step == "confirm_search":
+        state_context = f"\n\nCURRENT STATE: search_step=confirm_search. User needs to confirm searching for {state.get('search_to','')}. Call search_email_flow."
+    elif search_step == "awaiting_search_term":
+        state_context = "\n\nCURRENT STATE: search_step=awaiting_search_term. Ask who to search for and call search_email_flow."
     
     system = [SystemMessage(content=SYSTEM_PROMPT + state_context)]
     
@@ -379,19 +422,14 @@ def call_llm(state: AgentState):
     response = llm_with_tools.invoke(trimmed)
     
     if not response.content and not response.tool_calls:
- 
         if send_step in ("awaiting_recipient", "confirm_send"):
             last_human = next((m for m in reversed(messages) if m.type == "human"), None)
             topic = last_human.content if last_human else ""
-            response = AIMessage(
-                content="",
-                tool_calls=[{
-                    "name": "send_email_flow",
-                    "args": {"topic": topic},
-                    "id": "forced_call",
-                    "type": "tool_call"
-                }]
-            )
+            response = AIMessage(content="", tool_calls=[{"name": "send_email_flow", "args": {"topic": topic}, "id": "forced_call", "type": "tool_call"}])
+        elif search_step in ("confirm_search", "awaiting_search_term"):
+            last_human = next((m for m in reversed(messages) if m.type == "human"), None)
+            query = last_human.content if last_human else ""
+            response = AIMessage(content="", tool_calls=[{"name": "search_email_flow", "args": {"query": query}, "id": "forced_search", "type": "tool_call"}])
         else:
             response = AIMessage(content="I can help with emails. What would you like to do?")
     
@@ -400,8 +438,8 @@ def call_llm(state: AgentState):
 
 SIMPLE_TOOLS = {
     "delete_mail", "star_email", "unstar_email", "untrash_email",
-    "send_email_flow",
-    "read_mail", "read_filtered_mails",   
+    "send_email_flow", "search_email_flow",
+    "read_mail",   
     "navigate_email",                     
 }
 

@@ -30,6 +30,10 @@ class AgentState(TypedDict, total=False):
     send_to: str     
     send_step: str           
 
+    # email searching
+    search_to: str
+    search_step: str
+
     response: str
 
 class EmailSummary(BaseModel):

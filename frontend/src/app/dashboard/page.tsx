@@ -6,7 +6,7 @@ const DashboardPage = () => {
     return (
         <div className="relative overflow-hidden h-screen w-screen bg-[#030303]">
             <Navbar />
-            <div className="pt-20 h-full">
+            <div className="pt-20 h-[calc(100dvh-5rem)]">
                 <Chat />
             </div>
         </div>

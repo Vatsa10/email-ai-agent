@@ -18,12 +18,19 @@ export function useVoiceAgent(onMessage?: (role: "user" | "agent", text: string)
   const socketRef = useRef<WebSocket | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const isSpeaking = useRef(false);
-  const isPaused = useRef(false);       
+  const isPaused = useRef(false);
 
   const [listening, setListening] = useState(false);
-  const [paused, setPaused] = useState(false);  
+  const [paused, setPaused] = useState(false);
   const lastEmailIdRef = useRef<string | null>(null);
   const [lastEmailId, setLastEmailId] = useState<string | null>(null);
+
+  const [sendStep, setSendStep] = useState<string | null>(null);
+  const [draftSubject, setDraftSubject] = useState<string | null>(null);
+  const [draftBody, setDraftBody] = useState<string | null>(null);
+
+  const [searchStep, setSearchStep] = useState<string | null>(null);
+  const [searchTo, setSearchTo] = useState<string | null>(null);
 
   function startRecording() {
     if (!streamRef.current || !socketRef.current) return;
@@ -39,11 +46,55 @@ export function useVoiceAgent(onMessage?: (role: "user" | "agent", text: string)
     setListening(true);
   }
 
+  async function handleResponse(data: any) {
+    if (typeof data.email_id === "string") {
+      lastEmailIdRef.current = data.email_id;
+      setLastEmailId(data.email_id);
+    }
+    if (data.deleted === true) {
+      lastEmailIdRef.current = null;
+      setLastEmailId(null);
+    }
+
+    setSendStep(data.send_step || null);
+    setDraftSubject(data.draft_subject || null);
+    setDraftBody(data.draft_body || null);
+
+    setSearchStep(data.search_step || null);
+    setSearchTo(data.search_to || null);
+
+    onMessage?.("agent", data.response);
+
+    isSpeaking.current = true;
+    speak(cleanForSpeech(data.response), () => {
+      setTimeout(() => {
+        isSpeaking.current = false;
+        if (isPaused.current) return;
+
+        socketRef.current?.close();
+        socketRef.current = null;
+        startSession();
+      }, 200);
+    });
+  }
+
+  const sendText = async (text: string) => {
+    mediaRecorder.current?.stop();
+    mediaRecorder.current = null;
+    socketRef.current?.close();
+    socketRef.current = null;
+    setListening(false);
+
+    onMessage?.("user", text);
+    const data = await sendToBackend(text, lastEmailIdRef.current);
+    await handleResponse(data);
+  };
+
   function startSession() {
-    if (!streamRef.current || isPaused.current) return;  
+    if (!streamRef.current || isPaused.current) return;
 
     socketRef.current = createDeepgramSocket(async (finalText) => {
-      if (isSpeaking.current || isPaused.current) return; 
+      if (isSpeaking.current || isPaused.current) return;
       mediaRecorder.current?.stop();
       mediaRecorder.current = null;
       setListening(false);
@@ -64,29 +115,7 @@ export function useVoiceAgent(onMessage?: (role: "user" | "agent", text: string)
           : lastEmailIdRef.current
       );
 
-      if (typeof data.email_id === "string") {
-        lastEmailIdRef.current = data.email_id;
-        setLastEmailId(data.email_id);
-      }
-      if (data.deleted === true) {
-        lastEmailIdRef.current = null;
-        setLastEmailId(null);
-      }
-
-      onMessage?.("agent", data.response);
-
-      isSpeaking.current = true;
-      speak(cleanForSpeech(data.response), () => {
-        setTimeout(() => {
-          isSpeaking.current = false;
-          if (isPaused.current) return; 
-
-          socketRef.current?.close();
-          socketRef.current = null;
-          startSession();
-        }, 200);
-      });
-
+      await handleResponse(data);
     }, isSpeaking);
 
     socketRef.current.onopen = () => {
@@ -121,7 +150,7 @@ export function useVoiceAgent(onMessage?: (role: "user" | "agent", text: string)
     isPaused.current = false;
     setPaused(false);
     console.log("RESUMED - continuing conversation");
-    startSession();  
+    startSession();
   }
 
   function stop() {
@@ -129,7 +158,7 @@ export function useVoiceAgent(onMessage?: (role: "user" | "agent", text: string)
     mediaRecorder.current = null;
     socketRef.current?.close();
     socketRef.current = null;
-    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setListening(false);
   }
@@ -138,10 +167,30 @@ export function useVoiceAgent(onMessage?: (role: "user" | "agent", text: string)
     stop();
     lastEmailIdRef.current = null;
     setLastEmailId(null);
-    await fetch("http://localhost:8000/reset", { method: "POST" }); 
+    setSendStep(null);
+    setDraftSubject(null);
+    setDraftBody(null);
+    setSearchStep(null);
+    setSearchTo(null);
+    await fetch("http://localhost:8000/reset", { method: "POST" });
     await sendToBackend("reset", null);
     setTimeout(() => start(), 300);
   }
 
-  return { start, stop, reset, pause, resume, listening, paused, lastEmailId };
+  return {
+    start,
+    stop,
+    reset,
+    pause,
+    resume,
+    listening,
+    paused,
+    lastEmailId,
+    sendStep,
+    draftSubject,
+    draftBody,
+    searchStep,
+    searchTo,
+    sendText,
+  };
 }

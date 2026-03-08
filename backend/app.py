@@ -97,6 +97,11 @@ async def voice_input(payload: VoiceInput):
     return {
         "response": response_text,
         "email_id": result.get("email_id"),
+        "send_step": result.get("send_step"),
+        "draft_subject": result.get("draft_subject"),
+        "draft_body": result.get("draft_body"),
+        "search_step": result.get("search_step"),
+        "search_to": result.get("search_to"),
     }
 
 @app.post("/reset")

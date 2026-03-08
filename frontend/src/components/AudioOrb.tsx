@@ -66,12 +66,12 @@ const AudioOrb = ({ active }: { active: boolean }) => {
           opacity: active ? [0.2, 0.4, 0.2] : 0.1,
         }}
         transition={{ repeat: Infinity, duration: 2 }}
-        className="absolute h-80 w-80 rounded-full bg-blue-500/20 blur-3xl pointer-events-none"
+        className="absolute h-60 w-60 md:h-80 md:w-80 rounded-full bg-blue-500/20 blur-3xl pointer-events-none"
       />
 
       {/* Main Orb */}
       <div
-        className="relative h-64 w-64 rounded-full overflow-hidden transition-all duration-150 ease-out shadow-[0_0_50px_rgba(59,130,246,0.5)]"
+        className="relative h-48 w-48 md:h-64 md:w-64 rounded-full overflow-hidden transition-all duration-150 ease-out shadow-[0_0_50px_rgba(59,130,246,0.5)]"
         style={{
           transform: `scale(${scale})`,
           opacity: opacity,
@@ -105,14 +105,14 @@ const AudioOrb = ({ active }: { active: boolean }) => {
               animate={{ scale: 1.5, opacity: 0 }}
               exit={{ opacity: 0 }}
               transition={{ repeat: Infinity, duration: 1.5 }}
-              className="absolute h-64 w-64 rounded-full border border-blue-400/30"
+              className="absolute h-48 w-48 md:h-64 md:w-64 rounded-full border border-blue-400/30"
             />
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1.8, opacity: 0 }}
               exit={{ opacity: 0 }}
               transition={{ repeat: Infinity, duration: 2, delay: 0.5 }}
-              className="absolute h-64 w-64 rounded-full border border-indigo-400/20"
+              className="absolute h-48 w-48 md:h-64 md:w-64 rounded-full border border-indigo-400/20"
             />
           </>
         )}
