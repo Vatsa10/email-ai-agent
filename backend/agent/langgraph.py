@@ -102,7 +102,7 @@ def search_email_flow(query: str, state: Annotated[AgentState, InjectedState()])
     if step == "awaiting_search_term" or step == "confirm_search":
         # Check if user is confirming or providing a new term
         if any(w in query.lower() for w in ["yes", "correct", "confirm", "go ahead", "that's it"]):
-            state["sender_filter"] = state.get("search_to", "")
+            state["sender_filter"] = state.get("search_to", "").strip()
             state["email_ids"] = []
             state["email_index"] = 0
             result = read_filtered_emails_node(state)
@@ -110,7 +110,15 @@ def search_email_flow(query: str, state: Annotated[AgentState, InjectedState()])
             subject = result.get("email_subject", "")
             email_from = result.get("email_from", "unknown")
             body = result.get("email_body", "")
-            summary = summarize_email(subject, email_from, body) if body else result.get("response", "No emails found.")
+            
+            total_found = len(result.get("email_ids", []))
+            if total_found > 0:
+                summary = summarize_email(subject, email_from, body)
+                final_response = f"I found {total_found} emails. {summary}. (Email 1 of {total_found})"
+                if total_found > 1:
+                    final_response += ". You can say 'next' to see older emails."
+            else:
+                final_response = "No emails found from that sender."
 
             return Command(update={
                 "email_id": result.get("email_id", ""),
@@ -118,11 +126,11 @@ def search_email_flow(query: str, state: Annotated[AgentState, InjectedState()])
                 "email_subject": subject,
                 "email_body": body,
                 "email_ids": result.get("email_ids", []),
-                "email_index": result.get("email_index", 0),
+                "email_index": 0,
                 "sender_filter": state["sender_filter"],
                 "search_to": "",
                 "search_step": "",
-                "messages": [ToolMessage(content=summary, tool_call_id=tool_call_id)]
+                "messages": [ToolMessage(content=final_response, tool_call_id=tool_call_id)]
             })
         else:
             # Assume query is the new search term
@@ -147,14 +155,22 @@ def navigate_email(direction: str, state: Annotated[AgentState, InjectedState()]
     """
     tool_call_id = get_tool_call_id(state)
     state["navigation"] = direction if direction in ["next", "prev"] else "next"
-    result = read_email_node(state)
+    
+    # If a filter is active, navigate filtered results; otherwise navigate inbox
+    if state.get("sender_filter"):
+        result = read_filtered_emails_node(state)
+    else:
+        result = read_email_node(state)
 
     subject = result.get("email_subject", "")
     sender = result.get("email_from", "unknown")
     body = result.get("email_body", "")
 
-    from agent.nodes.send_mails.send_mail import summarize_email
     summary = summarize_email(subject, sender, body)
+    
+    count_info = ""
+    if state.get("email_ids"):
+        count_info = f" (Email {result.get('email_index', 0) + 1} of {len(state.get('email_ids', []))})"
 
     return Command(update={
         "email_id":      result.get("email_id", ""),
@@ -164,7 +180,7 @@ def navigate_email(direction: str, state: Annotated[AgentState, InjectedState()]
         "email_ids":     result.get("email_ids", state.get("email_ids", [])),
         "email_index":   result.get("email_index", 0),
         "navigation":    None,
-        "messages": [ToolMessage(content=summary, tool_call_id=tool_call_id)]
+        "messages": [ToolMessage(content=f"{summary}{count_info}", tool_call_id=tool_call_id)]
     })
     
 @tool
