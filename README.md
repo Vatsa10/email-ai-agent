@@ -1,16 +1,27 @@
 # Email Voice AI Agent
 
-**Email Voice AI Agent** is an intelligent, **voice-first AI email assistant** designed to make inbox management completely hands-free. Built with **LangGraph**, **FastAPI**, **Gmail API**, and **Next.js**, this agent allows you to read, summarize, star, and compose emails through natural conversation.
+**Email Voice AI Agent** is an intelligent, **voice-first AI email assistant** designed to make inbox management completely hands-free and robust. Built with **LangGraph**, **FastAPI**, **Gmail API**, and **Next.js**, this agent allows you to read, summarize, star, and compose emails through natural conversation, while maintaining total control via human-in-the-loop interfaces.
 
 ---
 
 ## Features
 
 ### Voice-Driven Email Management
-- **Inquiry**: "Read my latest emails" or "What's in my inbox?"
-- **Filtering**: "Read emails from Amazon" or specific senders.
+- **Smart Inquiry**: Ask "Read my latest emails" or "What's in my inbox?"
+- **Advanced Filtering**: "Read emails from Amazon" or specific senders.
+- **Search Navigation**: Navigate through multiple search results with simple "Next" and "Previous" commands.
 - **Smart Summarization**: Automatically summarizes long emails for quick voice consumption.
-- **Image Intelligence**: Detects image-only emails and describes them intelligently.
+
+### Human in the Loop (HITL)
+- **Draft Preview**: Visually verify email drafts with a dedicated high-fidelity preview card.
+- **Manual Overrides**: Type recipient email addresses or search terms directly if voice recognition is inadequate.
+- **Search Verification**: A safety step that asks for confirmation before executing an email search, allowing for instant corrections.
+
+### Premium UI & Mobile Experience
+- **Glassmorphic Design**: A state-of-the-art dark mode interface with vibrant gradients and subtle micros-animations.
+- **Dynamic Aurora Background**: Uses a custom GPU-accelerated shader for an immersive "AI Persona" feel.
+- **Full Responsiveness**: Optimized for desktop, tablets, and smartphones.
+- **PWA Ready**: Installable as a standalone app on your home screen for quick access.
 
 ### Conversational Compose & Send
 - **Natural Flow**: Guide the agent through recipient, subject, and body.
@@ -30,7 +41,8 @@ The agent uses a modern AI stack to handle real-time voice processing and comple
 
 ```mermaid
 graph TD
-    User((User)) <-->|Voice/Audio| FE[Next.js Frontend]
+    User((User)) <-->|Voice & Text| FE[Next.js Frontend]
+    FE <-->|HITL UI| Dashboard[/dashboard]
     FE <-->|STT: Deepgram| DG[Deepgram API]
     FE <-->|TTS: Web Speech API| WS[Browser Speech]
     
@@ -48,7 +60,7 @@ graph TD
 
 ## Technical Stack
 
-- **Frontend**: Next.js 15+, Tailwind CSS, Framer Motion.
+- **Frontend**: Next.js 15+, Tailwind CSS, Framer Motion, Lucide Icons.
 - **Language Processing**: Deepgram (Voice-to-Text), Web Speech API (Text-to-Voice).
 - **Orchestration**: LangGraph (Agentic state machine).
 - **Backend**: FastAPI (Python).
@@ -81,7 +93,7 @@ pip install -r requirements.txt
    *On first run, complete the OAuth flow in your browser.*
 
 ### 3. Frontend Configuration
-Navigate to `frontend/frontend/`:
+Navigate to `frontend/`:
 ```bash
 npm install
 ```
@@ -100,9 +112,7 @@ npm install
 - [ ] Multi-provider support (Outlook/iCloud).
 - [ ] Local LLM support for enhanced privacy.
 - [ ] Improved interruption handling during voice playback.
-- [ ] Attachment management via voice.
+- [ ] Direct attachment management via voice.
 
 ---
 *Created by [Vatsa](https://github.com/vatsa10)*
-
-
