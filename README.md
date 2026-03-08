@@ -42,7 +42,7 @@ The agent uses a modern AI stack to handle real-time voice processing and comple
 ```mermaid
 graph TD
     User((User)) <-->|Voice & Text| FE[Next.js Frontend]
-    FE <-->|HITL UI| Dashboard[/dashboard]
+    FE <-->|HITL UI| Dashboard["/dashboard"]
     FE <-->|STT: Deepgram| DG[Deepgram API]
     FE <-->|TTS: Web Speech API| WS[Browser Speech]
     
